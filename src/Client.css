@@ -18,3 +18,30 @@
     border-top-right-radius: 8px;
     resize: none;
 }
+.Client .ref {
+    font-size: 0.8em;
+    margin-bottom: -6px;
+    color: rgba(0,0,0,0.6);
+
+}
+
+.Client table {
+    border-collapse: collapse;
+}
+
+.Client td {
+    vertical-align: middle;
+    border-top: 1px solid #D5D5D5;
+}
+
+.Client .delete {
+    color: #FF7168;
+}
+
+.Client .insert {
+    color: #45966C;
+}
+
+.Client table pre {
+    margin: 0;
+}

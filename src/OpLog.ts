@@ -6,7 +6,7 @@ type Op =
       opId: OpID;
     }
   | {
-      action: "remove";
+      action: "delete";
       removedId: OpID;
       opId: OpID;
     };
@@ -39,12 +39,14 @@ export class OpBuffer {
   buffer: Array<{
     value: string;
     opId: OpID;
+    afterID: OpID;
     deleted: boolean;
   }> = [
     {
       value: "",
       opId: OpBuffer.START,
       deleted: false,
+      afterID: OpBuffer.START,
     },
   ];
 
@@ -53,17 +55,29 @@ export class OpBuffer {
   }
 
   applyOp(op: Op) {
-    const i = this.buffer.findIndex(
+    let i = this.buffer.findIndex(
       (o) => o.opId === (op.action === "insert" ? op.afterId : op.removedId)
     );
+
+    console.log(i, op);
     if (op.action === "insert") {
       // TODO skip further if needed
+      while (
+        i + 1 < this.buffer.length &&
+        this.buffer[i].opId.equals(this.buffer[i + 1].afterID) &&
+        this.buffer[i + 1].opId.clientId > op.opId.clientId
+      ) {
+        console.log("skipp", op.opId.toString());
+        i++;
+      }
+
       this.buffer.splice(i + 1, 0, {
         value: op.value,
         opId: op.opId,
         deleted: false,
+        afterID: op.afterId,
       });
-    } else if (op.action === "remove") {
+    } else if (op.action === "delete") {
       this.buffer[i].deleted = true;
     }
 
@@ -83,14 +97,10 @@ export class OpBuffer {
 export default class OpLog {
   buffer = new OpBuffer();
 
-  log: Array<{
-    isSynced: boolean;
-    op: Op;
-  }> = [];
+  log: Array<Op> = [];
 
   clientId: string;
   private counter = 0;
-  private oldValue = "";
 
   constructor(clientId: string) {
     this.clientId = clientId;
@@ -98,13 +108,14 @@ export default class OpLog {
 
   dispatchEvent = (value: string, cursorPosition: number) => {
     let newEnd = value.length - 1;
-    let oldEnd = this.oldValue.length - 1;
+    const oldValue = this.buffer.toString();
+    let oldEnd = oldValue.length - 1;
     let commonTailLength = 0;
     while (
       newEnd > -1 &&
       oldEnd > -1 &&
       newEnd >= cursorPosition &&
-      value[newEnd] === this.oldValue[oldEnd]
+      value[newEnd] === oldValue[oldEnd]
     ) {
       commonTailLength++;
       newEnd--;
@@ -116,9 +127,9 @@ export default class OpLog {
     let oldStart = 0;
     while (
       newStart < value.length &&
-      oldStart < this.oldValue.length &&
-      commonHeadLength < this.oldValue.length - commonTailLength && // TODO
-      value[newStart] === this.oldValue[oldStart]
+      oldStart < oldValue.length &&
+      commonHeadLength < value.length - commonTailLength && // TODO
+      value[newStart] === oldValue[oldStart]
     ) {
       commonHeadLength++;
       newStart++;
@@ -127,22 +138,18 @@ export default class OpLog {
 
     // remove
     for (
-      let i = commonHeadLength + 1;
-      i <= this.oldValue.length - commonTailLength;
-      i++
+      let i = oldValue.length - commonTailLength;
+      i > commonHeadLength;
+      i--
     ) {
       const removedId = this.buffer.idForVisibleIndex(i);
       const op = {
-        action: "remove" as const,
+        action: "delete" as const,
         removedId,
         opId: new OpID(this.clientId, this.counter++),
       };
       this.buffer.applyOp(op);
-
-      this.log.push({
-        isSynced: false,
-        op,
-      });
+      this.log.push(op);
     }
 
     // insert
@@ -157,26 +164,17 @@ export default class OpLog {
       };
 
       this.buffer.applyOp(op);
-
-      this.log.push({
-        isSynced: false,
-        op,
-      });
+      this.log.push(op);
     }
-
-    // update old value
-    this.oldValue = value;
   };
 
   onUpdate = (sub) => {
     this.buffer.subscriber = sub;
   };
 
-  getUnsyncedOps = () =>
-    this.log
-      .filter(({ isSynced }) => !isSynced)
-      .map((a) => {
-        a.isSynced = true;
-        return a.op;
-      });
+  getUnsyncedOps = () => {
+    const log = [...this.log];
+    this.log = [];
+    return log;
+  };
 }

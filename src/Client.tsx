@@ -14,29 +14,31 @@ export default function Client({
       <h2>Client {client.clientId}</h2>
       <textarea onChange={onChange} value={client.buffer.toString()} />
       <Buffer buffer={client.buffer} />
-      <h3>Operation Log</h3>
+      <h3>Unsynced Changes</h3>
       <table>
         <thead>
           <tr>
             <th>Action</th>
-            <th colSpan={2}>opID</th>
+            <th>opID</th>
+            <th>value</th>
+            <th>refID</th>
           </tr>
         </thead>
         <tbody>
           {client.log
             .slice()
             .reverse()
-            .map(({ op, isSynced }) => (
+            .map((op) => (
               <tr key={op.opId.toString()}>
-                <td>
-                  {isSynced ? "synchronised" : "not synchronised"}
-                  &nbsp;{op.action}
-                </td>
+                <td className={op.action}>{op.action}</td>
                 <td>{op.opId.toString()}</td>
-                <td>{op.action === "insert" ? op.value : ""}</td>
                 <td>
-                  {op.action === "insert" ? "afterID" : "removedID"}
-                  &nbsp;
+                  <pre>{op.action === "insert" ? op.value : ""}</pre>
+                </td>
+                <td>
+                  <div className="ref">
+                    {op.action === "insert" ? "after" : "delete"}
+                  </div>
                   {op.action === "insert"
                     ? op.afterId?.toString()
                     : op.removedId.toString()}
