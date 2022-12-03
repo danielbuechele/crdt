@@ -1,15 +1,29 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
 import "./App.css";
 import Client from "./Client";
+import useClient from "./useClient";
 
 function App() {
-  const [count, setCount] = useState(0);
+  const clientA = useClient("A");
+  const clientB = useClient("B");
 
   return (
     <div className="App">
-      <Client clientId="a" />
-      <Client clientId="b" />
+      <Client client={clientA.opLog} onChange={clientA.onChange} />
+      <button
+        className="syncButton"
+        title="sync now"
+        onClick={() => {
+          clientA.opLog
+            .getUnsyncedOps()
+            .forEach((op) => clientB.opLog.buffer.applyOp(op));
+          clientB.opLog
+            .getUnsyncedOps()
+            .forEach((op) => clientA.opLog.buffer.applyOp(op));
+        }}
+      >
+        🔄
+      </button>
+      <Client client={clientB.opLog} onChange={clientB.onChange} />
     </div>
   );
 }
